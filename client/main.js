@@ -7,7 +7,27 @@ import ReactDOM from 'react-dom';
 
 require("./styles.css");
 
+/////////*********** FLUX THINGS
+/////DISPATCHER
+var Dispatcher = require('flux').Dispatcher;
+var AppDispatcher = new Dispatcher();
 
+////ACTIONS
+var action={
+    addMeToPlace: function(place){
+        AppDispatcher.dispatch({actionType:"ADD_ME_TO_PLACE", place:place});
+    },
+    removeMeFromPlace: function(place){
+        AppDispatcher.dispatch({actionType:"REMOVE_ME_FROM_PLACE", place:place});
+    }
+};
+
+/////////////STORE
+var EventEmitter = require('events').EventEmitter;
+var assign = require('object-assign');
+
+
+//////////////////********END FLUX THIGS
 class Place extends React.Component {
     constructor(props){
         super(props);
