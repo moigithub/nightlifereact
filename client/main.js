@@ -14,17 +14,143 @@ var AppDispatcher = new Dispatcher();
 
 ////ACTIONS
 var action={
-    addMeToPlace: function(place){
-        AppDispatcher.dispatch({actionType:"ADD_ME_TO_PLACE", place:place});
+    getAllPlaces:function(location, userId){
+        //////////*************
+        
+        if(!location){
+            alert("getting location");
+            getLocationByIP(function(ipdata){
+                location=ipdata.city;
+                
+                
+                getBarsByLocation(location, processBars);
+
+            });
+        } else {
+            
+            getBarsByLocation(location, processBars);
+        }
+        
+        //////**************
+        
+        function processBars(err, data){
+            if (err) {
+                console.error(err);
+                throw err;
+            }
+
+            var yelpData = data.businesses;
+            
+            // get list of users registered by place
+            // and combine both data 
+            // add some count field
+            // add nother field to check if the user is going to that bar, to paint with another color
+            var API = "/api/places/"+location;
+            $.getJSON(API)
+            .done((places)=>{
+                console.log("places",places);
+                console.info("toobj", toObject("placeId", places));
+                // [ Location:"texax", PlaceId:"la-casa-1", Users:[1,2,3] ]
+                
+                var objPlaces = toObject("placeId", places);
+                yelpData=yelpData.map((yelp)=>{
+                    //var usersGoing = places.filter((place)=> yelp.id==place.placeId)[0];
+                    var usersGoing = objPlaces[yelp.id]; // should be faster than filter everytime
+                    
+                    //console.log("usersGoin",usersGoing);
+                    
+                    //default values
+                    yelp.usersGoing = 0;
+                    yelp.imOnList =false;
+                    if(usersGoing){
+                        var usersGoingCount = usersGoing.users.length;
+                        var imOnList = usersGoing.users.indexOf(userId)>-1;
+                        
+                        yelp.usersGoing = usersGoingCount;
+                       // yelp.users = usersGoing;
+                        yelp.imOnList = imOnList;
+                    }
+                    return yelp;
+                });
+
+            }).always(()=>{
+                //console.log(" yelp Data",yelpData);
+                //this.setState({places: yelpData});
+                AppDispatcher.dispatch({actionType:"LOAD_PLACES", places: yelpData});
+                
+            });//end getJSON "/api/places/:search"
+        }//end processBars
+        //////////
+
+
     },
-    removeMeFromPlace: function(place){
-        AppDispatcher.dispatch({actionType:"REMOVE_ME_FROM_PLACE", place:place});
-    }
+    toggleMeFromPlace: function(place, search, userId){
+        
+        var URL='/api/places';
+        $.post(URL,{
+            placeId:place.id,
+            search: search,
+            userId: userId
+        })
+            .done((placeData)=>{
+       //         console.log("registered",data);
+                //var yelpData= this.state.places.slice(); // GET PLACES FROM STORE ?
+                var yelpData = PlaceStore.getPlaces();
+                yelpData.map(yelp=>{
+                    //default values
+                    //yelp.usersGoing = 0;
+                    //yelp.imOnList =false;
+                    if(yelp.id==placeData.placeId){
+                        var usersGoingCount = placeData.users.length;
+                        var imOnList = placeData.users.indexOf(userId)>-1;
+                        
+                        yelp.usersGoing = usersGoingCount;
+                        yelp.imOnList = imOnList;
+                    }
+                    
+                    return yelp;
+                });
+                
+                //this.setState({places: yelpData});
+                AppDispatcher.dispatch({actionType:"TOGGLE_ME_FROM_PLACE", places:yelpData});
+            });
+    },
 };
 
 /////////////STORE
 var EventEmitter = require('events').EventEmitter;
 var assign = require('object-assign');
+
+var _places=[];
+
+function loadPlaces(places){
+    _places = places;
+}
+
+var PlaceStore = assign({}, EventEmitter.prototype, {
+    emitChange: function(){ this.emit('change'); },
+    addChangeListener:function(callback){ this.on('change', callback); },
+    removeChangeListener:function(callback){ this.removeListener('change', callback); },
+    getPlaces:function(){ return _places; },
+});
+
+//dispatcher callback
+AppDispatcher.register(function(payload){
+    var action = payload.action;
+    switch(action.actionType){
+        case 'LOAD_PLACES':
+            loadPlaces(action.places);
+            break;
+        case 'TOGGLE_ME_FROM_PLACE':
+            loadPlaces(action.places);
+            break;
+        default:
+            return true;
+    }
+    
+    PlaceStore.emitChange();
+    return true;
+});
 
 
 //////////////////********END FLUX THIGS
@@ -81,6 +207,18 @@ class Main extends React.Component {
         this.randomID = this.randomID.bind(this);
     }
     
+    componentDidMount(){
+        PlaceStore.addChangeListener(this._onChange);
+    }
+    
+    componentWillUnmount(){
+        PlaceStore.removeChangeListener(this._onChange);
+    }
+    
+    _onChange(){
+        this.setState({ places: PlaceStore.getPlaces() });
+    }
+    
     //////////////////////////////***************
     randomID(){
         alert("rnd id");
@@ -93,103 +231,17 @@ class Main extends React.Component {
     
     getBars(e){
         //helper
-
-        function processBars(err, data){
-            if (err) {
-                console.error(err);
-                throw err;
-            }
-            console.log( "stat search" , this.state.search, data.businesses);
-            
-            var yelpData = data.businesses;
-            
-            // get list of users registered by place
-            // and combine both data 
-            // add some count field
-            // add nother field to check if the user is going to that bar, to paint with another color
-            var API = "/api/places/"+this.state.search;
-            $.getJSON(API)
-            .done((places)=>{
-                console.log("places",places);
-                console.info("toobj", toObject("placeId", places))
-                // [ Location:"texax", PlaceId:"la-casa-1", Users:[1,2,3] ]
-                
-                var objPlaces = toObject("placeId", places);
-                yelpData=yelpData.map((yelp)=>{
-                    //var usersGoing = places.filter((place)=> yelp.id==place.placeId)[0];
-                    var usersGoing = objPlaces[yelp.id]; // should be faster than filter everytime
-                    
-                    //console.log("usersGoin",usersGoing);
-                    
-                    //default values
-                    yelp.usersGoing = 0;
-                    yelp.imOnList =false;
-                    if(usersGoing){
-                        var usersGoingCount = usersGoing.users.length;
-                        var imOnList = usersGoing.users.indexOf(this.state.userId)>-1;
-                        
-                        yelp.usersGoing = usersGoingCount;
-                       // yelp.users = usersGoing;
-                        yelp.imOnList = imOnList;
-                    }
-                    return yelp;
-                });
-
-            }).always(()=>{
-                //console.log(" yelp Data",yelpData);
-                this.setState({places: yelpData});
-                
-            });//end getJSON "/api/places/:search"
-        }//end processBars
-        //////////
-
         e.preventDefault();
-
-        var location = this.refs.place.value;
-        var component = this;
-        if(!location){
-            alert("getting location");
-            getLocationByIP(function(ipdata){
-                location=ipdata.city;
-                
-                component.setState({search: location});
-                getBarsByLocation(location, processBars.bind(component));
-
-            });
-        } else {
-            component.setState({search: location});
-            getBarsByLocation(location, processBars.bind(component));
-        }
+        action.getAllPlaces(this.refs.place.value, this.state.userId);
     }//end getBars
 
     registerPlace(place){
         //console.log(place, this.state);
-        var URL='/api/places';
-        $.post(URL,{
-            placeId:place.id,
-            search: this.state.search,
-            userId: this.state.userId
-        })
-            .done((data)=>{
-       //         console.log("registered",data);
-                var newData= this.state.places.slice();
-                newData.map(yelp=>{
-                    //default values
-                    //yelp.usersGoing = 0;
-                    //yelp.imOnList =false;
-                    if(yelp.id==data.placeId){
-                        var usersGoingCount = data.users.length;
-                        var imOnList = data.users.indexOf(this.state.userId)>-1;
-                        
-                        yelp.usersGoing = usersGoingCount;
-                        yelp.imOnList = imOnList;
-                    }
-                    
-                    return yelp;
-                });
-                
-                this.setState({places: newData});
-            });
+        var search= this.state.search,
+            userId= this.state.userId
+        
+        action.toggleMeFromPlace(place, search, userId);
+
     }
     
     render(){
