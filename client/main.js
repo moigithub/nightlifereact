@@ -16,7 +16,7 @@ var AppDispatcher = new Dispatcher();
 var action={
     getAllPlaces:function(location, userId){
         //////////*************
-        
+        console.log("localoca",location);
         if(!location){
             alert("getting location");
             getLocationByIP(function(ipdata){
@@ -57,7 +57,7 @@ var action={
                     //var usersGoing = places.filter((place)=> yelp.id==place.placeId)[0];
                     var usersGoing = objPlaces[yelp.id]; // should be faster than filter everytime
                     
-                    //console.log("usersGoin",usersGoing);
+                    console.log("usersGoin",usersGoing);
                     
                     //default values
                     yelp.usersGoing = 0;
@@ -74,7 +74,7 @@ var action={
                 });
 
             }).always(()=>{
-                //console.log(" yelp Data",yelpData);
+                console.log(" yelp Data",yelpData);
                 //this.setState({places: yelpData});
                 AppDispatcher.dispatch({actionType:"LOAD_PLACES", places: yelpData});
                 
@@ -85,7 +85,7 @@ var action={
 
     },
     toggleMeFromPlace: function(place, search, userId){
-        
+        console.log("toggle", place,search,userId);
         var URL='/api/places';
         $.post(URL,{
             placeId:place.id,
@@ -93,7 +93,7 @@ var action={
             userId: userId
         })
             .done((placeData)=>{
-       //         console.log("registered",data);
+                console.log("registered",placeData);
                 //var yelpData= this.state.places.slice(); // GET PLACES FROM STORE ?
                 var yelpData = PlaceStore.getPlaces();
                 yelpData.map(yelp=>{
@@ -112,6 +112,7 @@ var action={
                 });
                 
                 //this.setState({places: yelpData});
+                console.log("yelp toggle", yelpData);
                 AppDispatcher.dispatch({actionType:"TOGGLE_ME_FROM_PLACE", places:yelpData});
             });
     },
@@ -128,26 +129,32 @@ function loadPlaces(places){
 }
 
 var PlaceStore = assign({}, EventEmitter.prototype, {
-    emitChange: function(){ this.emit('change'); },
-    addChangeListener:function(callback){ this.on('change', callback); },
+    emitChange: function(){ console.log("emit changes"); this.emit('change'); },
+    addChangeListener: function(callback){ 
+        console.log("this from placestore",this);
+        this.on('change', callback ); 
+    },
     removeChangeListener:function(callback){ this.removeListener('change', callback); },
-    getPlaces:function(){ return _places; },
+    getPlaces:function(){ console.log("getPlaces from store");return _places; },
 });
 
 //dispatcher callback
-AppDispatcher.register(function(payload){
-    var action = payload.action;
+AppDispatcher.register(function(action){
+ //   console.log("dispatcher payload",action);
     switch(action.actionType){
         case 'LOAD_PLACES':
+            console.log("load places from dispatcher",action);
             loadPlaces(action.places);
             break;
         case 'TOGGLE_ME_FROM_PLACE':
+            console.log("toggle places from dispatcher",action);
             loadPlaces(action.places);
             break;
         default:
+            console.log("dispatcher callback default");
             return true;
     }
-    
+    console.log("calling emit");
     PlaceStore.emitChange();
     return true;
 });
@@ -201,6 +208,7 @@ class Main extends React.Component {
             userId:'125'
         };
 
+        this._onChange = this._onChange.bind(this);
         this.getBars = this.getBars.bind(this);
         this.registerPlace = this.registerPlace.bind(this);
         
@@ -216,6 +224,7 @@ class Main extends React.Component {
     }
     
     _onChange(){
+        console.log("_onChange");
         this.setState({ places: PlaceStore.getPlaces() });
     }
     
@@ -232,7 +241,9 @@ class Main extends React.Component {
     getBars(e){
         //helper
         e.preventDefault();
-        action.getAllPlaces(this.refs.place.value, this.state.userId);
+        var location = this.refs.place.value;
+        this.setState({search: location});
+        action.getAllPlaces(location, this.state.userId);
     }//end getBars
 
     registerPlace(place){
