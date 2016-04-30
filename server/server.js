@@ -142,12 +142,12 @@ app.get('/auth/twitter/callback',
   function(req, res) {
     // Successful authentication, redirect home.
     
-    res.redirect('/');
+    res.redirect('/login');
   });
   
 app.get('/auth/logout', function(req, res) {
         req.logout();
-        res.redirect('/successLogout'); // to let client know is loggedout.. and it should do cleanning
+        res.redirect('/logout'); // to let client know is loggedout.. and it should do cleanning
 });
     
 app.get('/auth/user', isLoggedIn, function(req,res){
