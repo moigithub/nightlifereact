@@ -141,7 +141,7 @@ app.get('/auth/twitter/callback',
     failureFlash : true }),
   function(req, res) {
     // Successful authentication, redirect home.
-    res.locals.test = "hello";
+    
     res.redirect('/');
   });
   

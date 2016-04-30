@@ -4,6 +4,8 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom';
+import {Router, Route, browserHistory, indexRoute, Redirect} from 'react-router';
+import auth from './auth';
 
 require("./styles.css");
 
@@ -16,7 +18,7 @@ var AppDispatcher = new Dispatcher();
 var action={
     getAllPlaces:function(location, userId){
         //////////*************
-        console.log("localoca",location);
+        //console.log("localoca",location);
         if(!location){
             alert("getting location");
             getLocationByIP(function(ipdata){
@@ -48,8 +50,8 @@ var action={
             var API = "/api/places/"+location;
             $.getJSON(API)
             .done((places)=>{
-                console.log("places",places);
-                console.info("toobj", toObject("placeId", places));
+                //console.log("places",places);
+                //console.info("toobj", toObject("placeId", places));
                 // [ Location:"texax", PlaceId:"la-casa-1", Users:[1,2,3] ]
                 
                 var objPlaces = toObject("placeId", places);
@@ -57,7 +59,7 @@ var action={
                     //var usersGoing = places.filter((place)=> yelp.id==place.placeId)[0];
                     var usersGoing = objPlaces[yelp.id]; // should be faster than filter everytime
                     
-                    console.log("usersGoin",usersGoing);
+                    //console.log("usersGoin",usersGoing);
                     
                     //default values
                     yelp.usersGoing = 0;
@@ -74,9 +76,9 @@ var action={
                 });
 
             }).always(()=>{
-                console.log(" yelp Data",yelpData);
+                //console.log(" yelp Data",yelpData);
                 //this.setState({places: yelpData});
-                AppDispatcher.dispatch({actionType:"LOAD_PLACES", places: yelpData});
+                AppDispatcher.dispatch({actionType:"LOAD_PLACES", places: yelpData, location:location});
                 
             });//end getJSON "/api/places/:search"
         }//end processBars
@@ -85,7 +87,7 @@ var action={
 
     },
     toggleMeFromPlace: function(place, search, userId){
-        console.log("toggle", place,search,userId);
+        //console.log("toggle", place,search,userId);
         var URL='/api/places';
         $.post(URL,{
             placeId:place.id,
@@ -93,7 +95,7 @@ var action={
             userId: userId
         })
             .done((placeData)=>{
-                console.log("registered",placeData);
+                //console.log("registered",placeData);
                 //var yelpData= this.state.places.slice(); // GET PLACES FROM STORE ?
                 var yelpData = PlaceStore.getPlaces();
                 yelpData.map(yelp=>{
@@ -112,7 +114,7 @@ var action={
                 });
                 
                 //this.setState({places: yelpData});
-                console.log("yelp toggle", yelpData);
+                //console.log("yelp toggle", yelpData);
                 AppDispatcher.dispatch({actionType:"TOGGLE_ME_FROM_PLACE", places:yelpData});
             });
     },
@@ -123,19 +125,28 @@ var EventEmitter = require('events').EventEmitter;
 var assign = require('object-assign');
 
 var _places=[];
+var _currentLocation='' || window.localStorage.barLocation;
 
 function loadPlaces(places){
     _places = places;
 }
+function setLocation(location){
+    _currentLocation=location;
+    window.localStorage.setItem('barLocation', location);
+}
 
 var PlaceStore = assign({}, EventEmitter.prototype, {
-    emitChange: function(){ console.log("emit changes"); this.emit('change'); },
+    emitChange: function(){  
+        this.emit('change'); 
+    },
     addChangeListener: function(callback){ 
-        console.log("this from placestore",this);
         this.on('change', callback ); 
     },
-    removeChangeListener:function(callback){ this.removeListener('change', callback); },
-    getPlaces:function(){ console.log("getPlaces from store");return _places; },
+    removeChangeListener: function(callback){ 
+        this.removeListener('change', callback); 
+    },
+    getPlaces: function(){ return _places; },
+    getLocation:function(){ return _currentLocation; },
 });
 
 //dispatcher callback
@@ -145,6 +156,7 @@ AppDispatcher.register(function(action){
         case 'LOAD_PLACES':
             console.log("load places from dispatcher",action);
             loadPlaces(action.places);
+            setLocation(action.location);
             break;
         case 'TOGGLE_ME_FROM_PLACE':
             console.log("toggle places from dispatcher",action);
@@ -217,6 +229,12 @@ class Main extends React.Component {
     
     componentDidMount(){
         PlaceStore.addChangeListener(this._onChange);
+        
+        /// check if location is set.. then call getBars()
+        console.log("mounted",PlaceStore.getLocation());
+        if (PlaceStore.getLocation()){
+            this.getBars();
+        }
     }
     
     componentWillUnmount(){
@@ -225,7 +243,7 @@ class Main extends React.Component {
     
     _onChange(){
         console.log("_onChange");
-        this.setState({ places: PlaceStore.getPlaces() });
+        this.setState({ places: PlaceStore.getPlaces(), search: PlaceStore.getLocation() });
     }
     
     //////////////////////////////***************
@@ -240,15 +258,22 @@ class Main extends React.Component {
     
     getBars(e){
         //helper
-        e.preventDefault();
+        if(e) e.preventDefault();
         var location = this.refs.place.value;
-        this.setState({search: location});
+        // if no input and is stored .. probably on localstorage
+        if(!location && PlaceStore.getLocation()){
+            //use the stored value
+            location = PlaceStore.getLocation();
+            //update the status input
+            this.refs.place.value = location;
+        }
+       // this.setState({search: location});
         action.getAllPlaces(location, this.state.userId);
     }//end getBars
 
     registerPlace(place){
         //console.log(place, this.state);
-        var search= this.state.search,
+        var search= PlaceStore.getLocation(),
             userId= this.state.userId
         
         action.toggleMeFromPlace(place, search, userId);
@@ -256,7 +281,7 @@ class Main extends React.Component {
     }
     
     render(){
-        console.log("main this.props ",this);
+        //console.log("main this.props ",this);
         return (
             <div>
                 <nav className="menu navbar navbar-default navbar-inverse">
@@ -347,8 +372,70 @@ function getBarsByLocation(location, callback){
         .fail(function( jqXHR, textStatus, err ) {
             callback(err)
         })
-    
 }
 /////////
 
-ReactDOM.render(<Main/>, document.getElementById("app"));
+//ReactDOM.render(<Main/>, document.getElementById("app"));
+
+
+class loggedIn extends React.Component {
+    constructor(props){
+        super(props);
+        
+    }
+    
+    componentDidMount(){
+            // request user data
+            auth.login(function(){
+                // redirect to /
+                setTimeout( ()=>{browserHistory.push('/')} ,1500);
+            });
+    }
+    
+    render(){
+        return (
+            <div>
+                <h1>You are logged in!</h1>
+                <p>...redirecting to homepage</p>
+            </div>
+            );
+    }
+    
+}
+
+class loggedOut extends React.Component {
+    constructor(props){
+        super(props);
+        
+    }
+    
+    componentDidMount(){
+            // request user data
+            auth.logout(function(){
+                // redirect to /
+                setTimeout( ()=>{browserHistory.push('/')} ,1500);
+            });
+    }
+    
+    render(){
+        return (
+            <div>
+                <h1>Thanks for playing with us!</h1>
+                <p>...redirecting to homepage</p>
+            </div>
+            );
+    }
+    
+}
+
+
+ReactDOM.render(
+    <Router history={browserHistory}>
+        <Route path="/" component={Main}>
+            
+        </Route>
+        <Route path="/login" component={loggedIn}></Route>
+        <Route path="/logout" component={loggedOut}></Route>
+        <Redirect from="*" to="/"/>
+    </Router>
+    , document.getElementById("app"));
