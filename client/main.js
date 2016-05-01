@@ -157,6 +157,19 @@ var PlaceStore = assign({}, EventEmitter.prototype, {
     getPlaces: function(){ return _places; },
     getLocation:function(){ return _currentLocation; },
     
+});
+
+var UserStore = assign({}, EventEmitter.prototype, {
+    emitChange: function(){  
+        this.emit('change'); 
+    },
+    addChangeListener: function(callback){ 
+        this.on('change', callback ); 
+    },
+    removeChangeListener: function(callback){ 
+        this.removeListener('change', callback); 
+    },
+
     getUser:function(){ return _user; },
     isLoggedIn:function(){ return _logged; },
 });
@@ -178,8 +191,7 @@ AppDispatcher.register(function(action){
             break;
         case 'USER_INFO':
             setUser(action.userInfo, action.logged);
-            //UserStore.emitChange();  //should be
-            PlaceStore.emitChange();
+            UserStore.emitChange();  
         default:
             console.log("dispatcher callback default");
             return true;
@@ -218,7 +230,7 @@ class Place extends React.Component {
                     <p className="snippet">{this.props.place.snippet_text}</p>
                     <p className="address">{this.props.place.location.display_address.join(" - ")}</p>
                   </div>
-                  { PlaceStore.isLoggedIn() &&
+                  { UserStore.isLoggedIn() &&
                   <div className="pull-right">
                     <button className={"btn btn-sm "+buttonClass} onClick={this.props.register}><span className="badge">{this.props.place.usersGoing} Going</span> {buttonText}</button>
                   </div>
@@ -242,6 +254,7 @@ class Main extends React.Component {
         };
 
         this._onChange = this._onChange.bind(this);
+        this._onUserChange = this._onUserChange.bind(this);
         this.getBars = this.getBars.bind(this);
         this.registerPlace = this.registerPlace.bind(this);
         
@@ -249,6 +262,7 @@ class Main extends React.Component {
     
     componentDidMount(){
         PlaceStore.addChangeListener(this._onChange);
+        UserStore.addChangeListener(this._onUserChange);
         
         /// check if location is set.. then call getBars()
         console.log("mounted",PlaceStore.getLocation());
@@ -259,6 +273,7 @@ class Main extends React.Component {
     
     componentWillUnmount(){
         PlaceStore.removeChangeListener(this._onChange);
+        UserStore.removeChangeListener(this._onUserChange);
     }
     
     _onChange(){
@@ -266,6 +281,12 @@ class Main extends React.Component {
         this.setState({ 
             places: PlaceStore.getPlaces(), 
             search: PlaceStore.getLocation(),
+        });
+    }
+    
+    _onUserChange(){
+        console.log("_onChange");
+        this.setState({ 
             user: PlaceStore.getUser()
         });
     }
@@ -313,7 +334,7 @@ class Main extends React.Component {
                         <a href="#" className="navbar-brand">Home</a>
                     </div>
                     
-                    { PlaceStore.isLoggedIn() ?
+                    { UserStore.isLoggedIn() ?
                         <div className="collapse navbar-collapse" id="topmenu">
                             <ul className="nav navbar-nav navbar-right">
                                 <li className="navbar-text">Welcome <span>{this.state.user.displayName}</span></li>
