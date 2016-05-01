@@ -342,6 +342,7 @@ class Main extends React.Component {
                             </ul>
                         </div>
                     :
+                        
                         <div className="collapse navbar-collapse" id="topmenu">
                             <ul className="nav navbar-nav navbar-right">
                                 <li className="navbar-text">Login with</li>
@@ -354,7 +355,13 @@ class Main extends React.Component {
                     
                 </nav>
 
-                <div className="container">    
+                <div className="container">   
+                    { !UserStore.isLoggedIn() && 
+                        <div className="alert alert-info text-center" role="alert">
+                            <a href="/auth/twitter" className="alert-link">Log In</a>&nbsp; to register to a place
+                        </div>
+                    }
+                    
                     <h1 className="text-center">Plans tonight?</h1>
                     <h3 className="text-center">See which bars are hoppin' tonight and RSVP ahead of time!</h3>
                     <h6 className="text-center">Remember: take a cab and drink responsibly.</h6>
