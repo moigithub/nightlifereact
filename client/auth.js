@@ -2,16 +2,17 @@
 /*global localStorage*/
 /*global $*/
 
-var user = {};  // is stored on client, so not affecting multiple users from diff part of world
+//var user = {};  // is stored on client, so not affecting multiple users from diff part of world
 
 module.exports = {
     login:function(cb){
         $.get("/auth/user/")
             .done((data)=>{
-                user = data.twitter;
-                user.userId = data._id;
-                localStorage.token = data._id;
-                localStorage.userData = JSON.stringify(user);
+                console.log(data);
+  //              user = data.twitter;
+  //              user.userId = data.id;
+                localStorage.token = data.id;
+                localStorage.userData = JSON.stringify(data);
                 //localStorage.displayName = data.twitter.displayName;
                // console.log("auth login",user);
                 //this.setState({user: JSON.stringify(data)});
@@ -20,14 +21,14 @@ module.exports = {
             })
             .fail(function() {
                 console.error( "users/ error getting api/votes data" );
-                user = {};
+    //            user = {};
             });
         
     },
     logout:function(cb){
         $.get("/auth/logout")
             .done((data)=>{
-                user={};
+    //            user={};
                 delete localStorage.token;
                 //delete localStorage.displayName;
             //    console.log("auth logged out");
@@ -38,7 +39,7 @@ module.exports = {
             });        
     },
     getCurrentUser:function(){
-        user = JSON.parse(localStorage.userData||"{}");
+        var user = JSON.parse(localStorage.userData||"{}");
         return user;
         // deberia recuperar data from localStorage, to prevent lost when refresh
     },

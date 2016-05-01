@@ -118,6 +118,9 @@ var action={
                 AppDispatcher.dispatch({actionType:"TOGGLE_ME_FROM_PLACE", places:yelpData});
             });
     },
+    setUserInfo:function(userInfo, status){
+        AppDispatcher.dispatch({actionType:'USER_INFO', userInfo: userInfo, logged: status});
+    },
 };
 
 /////////////STORE
@@ -126,6 +129,8 @@ var assign = require('object-assign');
 
 var _places=[];
 var _currentLocation='' || window.localStorage.barLocation;
+var _user={};
+var _logged=false;
 
 function loadPlaces(places){
     _places = places;
@@ -133,6 +138,10 @@ function loadPlaces(places){
 function setLocation(location){
     _currentLocation=location;
     window.localStorage.setItem('barLocation', location);
+}
+function setUser(userInfo, status){
+    _user = userInfo;
+    _logged = status;
 }
 
 var PlaceStore = assign({}, EventEmitter.prototype, {
@@ -147,6 +156,9 @@ var PlaceStore = assign({}, EventEmitter.prototype, {
     },
     getPlaces: function(){ return _places; },
     getLocation:function(){ return _currentLocation; },
+    
+    getUser:function(){ return _user; },
+    isLoggedIn:function(){ return _logged; },
 });
 
 //dispatcher callback
@@ -157,17 +169,22 @@ AppDispatcher.register(function(action){
             console.log("load places from dispatcher",action);
             loadPlaces(action.places);
             setLocation(action.location);
+            PlaceStore.emitChange();
             break;
         case 'TOGGLE_ME_FROM_PLACE':
             console.log("toggle places from dispatcher",action);
             loadPlaces(action.places);
+            PlaceStore.emitChange();
             break;
+        case 'USER_INFO':
+            setUser(action.userInfo, action.logged);
+            //UserStore.emitChange();  //should be
+            PlaceStore.emitChange();
         default:
             console.log("dispatcher callback default");
             return true;
     }
     console.log("calling emit");
-    PlaceStore.emitChange();
     return true;
 });
 
@@ -201,9 +218,11 @@ class Place extends React.Component {
                     <p className="snippet">{this.props.place.snippet_text}</p>
                     <p className="address">{this.props.place.location.display_address.join(" - ")}</p>
                   </div>
+                  { PlaceStore.isLoggedIn() &&
                   <div className="pull-right">
                     <button className={"btn btn-sm "+buttonClass} onClick={this.props.register}><span className="badge">{this.props.place.usersGoing} Going</span> {buttonText}</button>
                   </div>
+                  }
                 </div>
             </li>
         );
@@ -217,14 +236,15 @@ class Main extends React.Component {
         this.state = {
             places:[],
             search:'',
-            userId:'125'
+//            userId:'125',
+            user:{},
+//            logged:false,
         };
 
         this._onChange = this._onChange.bind(this);
         this.getBars = this.getBars.bind(this);
         this.registerPlace = this.registerPlace.bind(this);
         
-        this.randomID = this.randomID.bind(this);
     }
     
     componentDidMount(){
@@ -243,17 +263,15 @@ class Main extends React.Component {
     
     _onChange(){
         console.log("_onChange");
-        this.setState({ places: PlaceStore.getPlaces(), search: PlaceStore.getLocation() });
+        this.setState({ 
+            places: PlaceStore.getPlaces(), 
+            search: PlaceStore.getLocation(),
+            user: PlaceStore.getUser()
+        });
     }
     
-    //////////////////////////////***************
-    randomID(){
-        alert("rnd id");
-        this.setState({userId: Math.floor(Math.random()*10).toString()});
-        console.log("new userId",this.state.userId);
-    }
-    
-    ////
+
+////
     ////
     
     getBars(e){
@@ -268,13 +286,13 @@ class Main extends React.Component {
             this.refs.place.value = location;
         }
        // this.setState({search: location});
-        action.getAllPlaces(location, this.state.userId);
+        action.getAllPlaces(location, this.state.user.id);
     }//end getBars
 
     registerPlace(place){
         //console.log(place, this.state);
         var search= PlaceStore.getLocation(),
-            userId= this.state.userId
+            userId= this.state.user.id
         
         action.toggleMeFromPlace(place, search, userId);
 
@@ -295,16 +313,24 @@ class Main extends React.Component {
                         <a href="#" className="navbar-brand">Home</a>
                     </div>
                     
-                    <div className="collapse navbar-collapse" id="topmenu">
-                        <ul className="nav navbar-nav navbar-right">
-                            <li className="navbar-text"> 
-<button className="btn btn-success" onClick={this.randomID}>random id</button> 
-{this.state.userId}
-                                Login with
-                            </li>
-                            <li><a href="/auth/twitter">Twitter</a></li>
-                        </ul>
-                    </div>
+                    { PlaceStore.isLoggedIn() ?
+                        <div className="collapse navbar-collapse" id="topmenu">
+                            <ul className="nav navbar-nav navbar-right">
+                                <li className="navbar-text">Welcome <span>{this.state.user.displayName}</span></li>
+                                <li><a href="/auth/logout" className="btn"><span className="fa fa-times"></span> Logout</a></li>
+                            </ul>
+                        </div>
+                    :
+                        <div className="collapse navbar-collapse" id="topmenu">
+                            <ul className="nav navbar-nav navbar-right">
+                                <li className="navbar-text">Login with</li>
+                                <li><a href="/auth/twitter" className="btn"><span className="fa fa-twitter"></span> Twitter</a></li>
+                            </ul>
+                        </div>
+                    }
+                    
+                    
+                    
                 </nav>
 
                 <div className="container">    
@@ -388,7 +414,8 @@ class loggedIn extends React.Component {
             // request user data
             auth.login(function(){
                 // redirect to /
-                setTimeout( ()=>{browserHistory.push('/')} ,1500);
+                action.setUserInfo(auth.getCurrentUser(), auth.isLoggedIn());
+                setTimeout( ()=>{browserHistory.push('/')} ,200);
             });
     }
     
@@ -412,8 +439,9 @@ class loggedOut extends React.Component {
     componentDidMount(){
             // request user data
             auth.logout(function(){
+                action.setUserInfo({},false);
                 // redirect to /
-                setTimeout( ()=>{browserHistory.push('/')} ,1500);
+                setTimeout( ()=>{browserHistory.push('/')} ,200);
             });
     }
     
